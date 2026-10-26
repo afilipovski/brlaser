@@ -39,6 +39,12 @@ namespace {
 cups_raster_t *ras;
 volatile sig_atomic_t interrupted = 0;
 
+// For modes like 600x300dpi, each raster row is sent this many times
+// so the printer receives a page at the horizontal resolution.
+unsigned line_repeat = 1;
+unsigned repeats_left = 0;
+std::vector<uint8_t> repeated_line;
+
 
 void sigterm_handler(int sig) {
   interrupted = 1;
@@ -49,7 +55,20 @@ bool next_line(std::vector<uint8_t> &buf) {
   if (interrupted) {
     return false;
   }
-  return cupsRasterReadPixels(ras, buf.data(), buf.size()) == buf.size();
+  if (repeats_left > 0) {
+    // The encoder swaps buffers between calls, so copy from our own.
+    --repeats_left;
+    std::copy(repeated_line.begin(), repeated_line.end(), buf.begin());
+    return true;
+  }
+  if (cupsRasterReadPixels(ras, buf.data(), buf.size()) != buf.size()) {
+    return false;
+  }
+  if (line_repeat > 1) {
+    repeated_line = buf;
+    repeats_left = line_repeat - 1;
+  }
+  return true;
 }
 
 
@@ -87,8 +106,9 @@ std::string ascii_job_name(const char *job_id, const char *job_user, const char 
 }
 
 page_params build_page_params(const cups_page_header2_t &header) {
-  static const std::array<std::string, 6> sources = {{
-    "AUTO", "T1", "T2", "T3", "MP", "MANUAL"
+  // Index 6 is the name Brother's HL-1110 driver uses for its only tray.
+  static const std::array<std::string, 7> sources = {{
+    "AUTO", "T1", "T2", "T3", "MP", "MANUAL", "TRAY1"
   }};
   static const std::map<std::string, std::string> sizes = {
     { "A4", "A4" },
@@ -186,8 +206,15 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "DEBUG: " PACKAGE ": Page header of first page\n");
         dump_page_header(header);
       }
+      line_repeat = 1;
+      repeats_left = 0;
+      if (header.HWResolution[1] > 0
+          && header.HWResolution[1] < header.HWResolution[0]
+          && header.HWResolution[0] % header.HWResolution[1] == 0) {
+        line_repeat = header.HWResolution[0] / header.HWResolution[1];
+      }
       job.encode_page(build_page_params(header),
-                      header.cupsHeight,
+                      header.cupsHeight * line_repeat,
                       header.cupsBytesPerLine,
                       next_line);
       fprintf(stderr, "PAGE: %d %d\n", job.pages(), header.NumCopies);

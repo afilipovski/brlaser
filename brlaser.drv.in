@@ -31,6 +31,43 @@ Version "@BRLASER_VERSION@"
 // Each filter provided by the driver...
 Filter application/vnd.cups-raster 33 rastertobrlaser
 
+HWMargins 8 8 8 16
+
+// The HL-1110 series has 1 MiB of memory and only the options that
+// Brother's own HL-1110 driver offers. Its PJL names (REGULAR, TRAY1)
+// were taken from Brother's rawtobr3 output.
+{
+  ModelName "HL-1110"
+  Attribute "NickName" "" "Brother HL-1110 series, $USING"
+  Attribute "1284DeviceID" "" "MFG:Brother;CMD:PJL,HBP;MDL:HL-1110 series;CLS:PRINTER;CID:Brother Laser Type3;"
+  PCFileName "br1110.ppd"
+
+  // 600x300 is Brother's "Normal" mode: the filter sends every row
+  // twice as a 600dpi page. That roughly halves the data for text and
+  // dense images, but halftoned gray areas compress about 5x worse
+  // than at 600dpi, so it is not the default here.
+  // 1200dpi is not offered by Brother for this model.
+  Resolution k 1 0 0 0 "300dpi/300 DPI"
+  Resolution k 1 0 0 0 "600x300dpi/600x300 DPI (Normal)"
+  *Resolution k 1 0 0 0 "600dpi/600 DPI (Fine)"
+
+  *MediaSize A4
+  MediaSize Legal
+  MediaSize Letter
+
+  *InputSlot 6 "Tray1/Tray 1"
+
+  *MediaType 0 "REGULAR/Plain paper"
+  MediaType 9 "RECYCLED/Recycled paper"
+
+  Option "brlaserEconomode/Toner save mode" Boolean AnySetup 10
+    *Choice False/Off "<</cupsInteger10 0>>setpagedevice"
+    Choice True/On "<</cupsInteger10 1>>setpagedevice"
+}
+
+// All other printers.
+{
+
 // Supported resolutions.
 // The 1200dpi mode is weird: we need to send 1200x1200dpi raster
 // data, but Brother only advertises 1200x600dpi. I wonder what
@@ -42,7 +79,6 @@ Filter application/vnd.cups-raster 33 rastertobrlaser
 Resolution k 1 0 0 0 "1200dpi/1200HQ"
 
 // Supported page sizes.
-HWMargins 8 8 8 16
 *MediaSize A4
 MediaSize A5
 MediaSize A6
@@ -190,14 +226,6 @@ Option "brlaserEconomode/Toner save mode" Boolean AnySetup 10
 }
 
 {
-  ModelName "HL-1110"
-  Attribute "NickName" "" "Brother HL-1110 series, $USING"
-  Attribute "1284DeviceID" "" "MFG:Brother;CMD:PJL,HBP;MDL:HL-1110 series;CLS:PRINTER;CID:Brother Laser Type3;"
-  Resolution k 1 0 0 0 "300dpi/300 DPI"
-  PCFileName "br1110.ppd"
-}
-
-{
   ModelName "HL-1200"
   Attribute "NickName" "" "Brother HL-1200 series, $USING"
   Attribute "1284DeviceID" "" "MFG:Brother;CMD:PJL,HBP;MDL:HL-1200 series;CLS:PRINTER;CID:Brother Laser Type3;"
@@ -342,3 +370,5 @@ Option "brlaserEconomode/Toner save mode" Boolean AnySetup 10
   Duplex rotated
   PCFileName "brl2710.ppd"
 }
+
+}  // All other printers
